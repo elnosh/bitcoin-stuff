@@ -3,7 +3,7 @@ use bitcoin::{
     consensus::encode::deserialize_hex,
     hashes::{serde::Serialize, sha256d::Hash},
     transaction::Version,
-    ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Weight, Witness,
+    Amount, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Weight, Witness,
 };
 
 #[derive(Serialize)]
@@ -77,14 +77,54 @@ impl From<TxIn> for TxInResponse {
 #[derive(Serialize)]
 pub struct TxOutput {
     explainer: TxOutExplainer,
-    output: Vec<TxOut>,
+    output: Vec<TxOutResponse>,
 }
 
 #[derive(Serialize)]
 struct TxOutExplainer {
     value: String,
     script_pubkey: String,
-    // extend script
+    script: String,
+}
+
+#[derive(Serialize)]
+struct TxOutResponse {
+    sats_value: Amount,
+    btc_value: String,
+    script_pubkey: ScriptBuf,
+    script: String,
+    script_type: String,
+}
+
+impl From<TxOut> for TxOutResponse {
+    fn from(tx_out: TxOut) -> Self {
+        let output_script = tx_out.script_pubkey.clone();
+        let script_type = {
+            if output_script.is_p2pk() {
+                "Pay to Public Key (P2PK)"
+            } else if output_script.is_p2pkh() {
+                "Pay to Public Key Hash (P2PKH)"
+            } else if output_script.is_p2sh() {
+                "Pay to Script Hash (P2SH)"
+            } else if output_script.is_p2wpkh() {
+                "Pay to Witness Public Key Hash (P2WPKH)"
+            } else if output_script.is_p2wsh() {
+                "Pay to Witness Script Hash (P2WSH)"
+            } else if output_script.is_p2tr() {
+                "Pay to Taproot (P2TR)"
+            } else {
+                "unknown"
+            }
+        };
+
+        TxOutResponse {
+            sats_value: tx_out.value,
+            btc_value: tx_out.value.to_string_in(bitcoin::Denomination::Bitcoin),
+            script_pubkey: tx_out.script_pubkey.clone(),
+            script: tx_out.script_pubkey.to_asm_string(),
+            script_type: script_type.to_string(),
+        }
+    }
 }
 
 impl From<Transaction> for TransactionResponse {
@@ -139,9 +179,10 @@ impl From<Transaction> for TransactionResponse {
             output: TxOutput {
                 explainer: TxOutExplainer {
                     value: String::from("amount of sats being sent"),
-                    script_pubkey: String::from("script specifying the conditions that must be met to spend this output")
+                    script_pubkey: String::from("script specifying the conditions that must be met to spend this output"),
+                    script: String::from("script in human readable form")
                 },
-                output: tx.output
+                output: tx.output.into_iter().map(TxOutResponse::from).collect(),
             },
         }
     }
