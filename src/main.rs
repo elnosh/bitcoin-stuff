@@ -15,15 +15,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Gettxinfo { rawtx: String },
+    Gettxinfo { tx: String },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Gettxinfo { rawtx } => {
-            transaction::get_tx_info(rawtx).unwrap();
+        Commands::Gettxinfo { tx } => {
+            transaction::get_tx_info(tx).await.unwrap()
         }
     }
 }

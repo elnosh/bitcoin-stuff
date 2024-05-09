@@ -188,8 +188,21 @@ impl From<Transaction> for TransactionResponse {
     }
 }
 
-pub fn get_tx_info(rawtx: String) -> Result<(), String> {
-    let tx: Transaction = deserialize_hex(rawtx.as_str()).unwrap();
+// it can receive either the raw tx or the txid
+pub async fn get_tx_info(tx: String) -> Result<(), String> {
+    let mut tx = tx.clone();
+    // get tx from esplora if txid
+    if tx.len() == 64 {
+        let url = format!("https://blockstream.info/api/tx/{}/hex", tx);
+        tx = reqwest::get(url)
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+    }
+
+    let tx: Transaction = deserialize_hex(tx.as_str()).unwrap();
     let tx = TransactionResponse::from(tx);
     let tx = serde_json::to_string_pretty(&tx).unwrap();
     println!("{}", tx);
